@@ -1,0 +1,12 @@
+Exception in thread "main" java.lang.Exception: Syntax error in the symbol "while" from line 19, column 1 to line 19, column 5
+instead the expected token classes are []
+Couldn't repair and continue parse in the symbol "while" from line 19, column 1 to line 19, column 5
+
+	at grammar.parser.parse(parser.java:472)
+	at grammar.parser.main(parser.java:477)
+Caused by: java.lang.Exception: Can't recover from previous error(s)
+	at java_cup.runtime.lr_parser.report_fatal_error(lr_parser.java:392)
+	at java_cup.runtime.lr_parser.unrecovered_syntax_error(lr_parser.java:539)
+	at java_cup.runtime.lr_parser.parse(lr_parser.java:731)
+	at grammar.parser.parse(parser.java:468)
+	... 1 more

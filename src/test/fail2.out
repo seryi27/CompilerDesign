@@ -1,0 +1,7 @@
+Exception in thread "main" javaCode.LexerException: Error at line 43 column 1: Unterminated multiline comment at end of file.
+	at grammar.Lexer.next_token(Lexer.java:747)
+	at java_cup.runtime.ScannerBuffer.next_token(ScannerBuffer.java:26)
+	at java_cup.runtime.lr_parser.scan(lr_parser.java:366)
+	at java_cup.runtime.lr_parser.parse(lr_parser.java:693)
+	at grammar.parser.parse(parser.java:468)
+	at grammar.parser.main(parser.java:477)
