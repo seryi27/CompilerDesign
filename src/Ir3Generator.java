@@ -20,7 +20,7 @@ public class Ir3Generator {
     private int labelCounter;
 
     public static void main(String[] args) throws Exception {
-        Ast.Program prog = Parser.parse(new BufferedReader(new FileReader(args[0])));
+        Ast.Program prog = parser.parse(new BufferedReader(new FileReader(args[0])));
         try {
             StaticChecker.run(prog);
         } catch (StaticChecker.SemanticErrors e) {
@@ -111,7 +111,7 @@ public class Ir3Generator {
             for (Ast.VarDecl v : meth.vars) {
                 String name = v.name;
                 if (processedNames.contains(name)) {
-                    int ctr = 1;
+                    int ctr = 2;
                     while (processedNames.contains(name + "__" + ctr))
                         ctr++;
                     String newName = name + "__" + ctr;
@@ -368,8 +368,9 @@ public class Ir3Generator {
                 return new RetValBlock(new Ir3.VarRetVal(decl2Var.get(varDecl)), new ArrayList<>());
             } else if (decl2Field.containsKey(varDecl)) {
                 ArrayList<Ir3.Stmt> stmts = new ArrayList<>();
-                stmts.add(new Ir3.FieldAccessStmt(genTemporalVar(expr.typ), new Ir3.VarRetVal(thisVar), decl2Field.get(varDecl)));
-                return new RetValBlock(new Ir3.VarRetVal(genTemporalVar(expr.typ)), stmts);
+                Ir3.Var temp = genTemporalVar(expr.typ);
+                stmts.add(new Ir3.FieldAccessStmt(temp, new Ir3.VarRetVal(thisVar), decl2Field.get(varDecl)));
+                return new RetValBlock(new Ir3.VarRetVal(temp), stmts);
             } else {
                 throw new AssertionError("ERR: no VarDecl tied to ident");
             }
@@ -496,7 +497,7 @@ public class Ir3Generator {
 
                 RetValBlock leftSec = runRetVal(((Ast.BinaryExpr) expr).lexp);
                 RetValBlock rightSec = runRetVal(((Ast.BinaryExpr) expr).rexp);
-                Ir3.Var dst = genTemporalVar(expr.typ);
+                Ir3.Var dst = genTemporalVar(new Ast.IntTyp());
                 ArrayList<Ir3.Stmt> stmts = new ArrayList<>();
                 stmts.addAll(leftSec.stmts);
                 stmts.addAll(rightSec.stmts);
@@ -542,7 +543,7 @@ public class Ir3Generator {
             return new RetValBlock(new Ir3.VarRetVal(temp), stmts);
             
         } else if (expr instanceof Ast.NewExpr) {
-            Ir3.Var temp = genTemporalVar(expr.typ);
+            Ir3.Var temp = genTemporalVar(new Ast.ClazzTyp(((Ast.NewExpr) expr).cname));
             ArrayList<Ir3.Stmt> stmts = new ArrayList<>();
             stmts.add(new Ir3.NewStmt(temp, dataMap.get(((Ast.NewExpr) expr).cname)));
             return new RetValBlock(new Ir3.VarRetVal(temp), stmts);
