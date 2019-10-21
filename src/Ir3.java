@@ -24,13 +24,20 @@ public class Ir3 {
 
         public String prettyPrint(int indent) {
             StringBuilder sb = new StringBuilder();
+            
+            sb.append("====== CData3 ======\n\n");
+            
             for (Data data : datas) {
                 sb.append(data.prettyPrint(indent));
+                sb.append("\n");
             }
+            sb.append("====== CMtd3 ======\n\n");
             for (Meth meth : meths) {
                 sb.append(meth.prettyPrint(indent));
+                sb.append("\n");
             }
-            return sb.toString();
+            if(sb.length() > 0) return sb.toString();
+            return "";
         }
     }
 
@@ -46,7 +53,7 @@ public class Ir3 {
         public String prettyPrint(int indent) {
             StringBuilder sb = new StringBuilder();
             indent(sb, indent);
-            sb.append("Data3 ").append(cname).append(" {\n");
+            sb.append("class ").append(cname).append(" {\n");
             for (DataField dataField : fields) {
                 sb.append(dataField.prettyPrint(indent+1));
             }
@@ -177,7 +184,8 @@ public class Ir3 {
             for (Stmt stmt : stmts) {
                 sb.append(stmt.prettyPrint(indent));
             }
-            return sb.toString();
+            if(sb.length() > 0) return sb.toString();
+            return "";
         }
 
         public List<Block> getOutList() {
