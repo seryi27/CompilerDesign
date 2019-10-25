@@ -1,0 +1,30 @@
+This is a project consisting on a compiler for a little languaje called jflex. For the moment it pass the program through an static checker and if it succeeds generates the Ir3 code corresponding to it.
+
+How to run it:
+First of all, in order to run this project, we should follow this steps:
+	- unzip the files.
+	- Run a Make command to use the makefile of the project. See the makefile section for more info
+
+MAKEFILE
+The makefile provided has 4 actions:
+	-all: it generates the lexer, the parser and the sym files, then it compiles every java file in the project (into the compiled folder) and finally it executes one of the tests. By default it executes the "irCode1.j" file from the test folder. In order to execute another file from this folder it can be made adding ARG='name_of_the_file' to the command. (NOTE: the name shouldn't include the './test/' part, neither the '.j' at the end. It must be a file who lives in the test folder.
+	Example: 1) make run 
+		 2) make run ARG='irCode2'
+
+	-compile: it generates the lexer, the parser and the sym files, and then it compiles every java file in the project into the compiled folder.
+	
+	-run: it executes the "irCode1.j" file by default, but it can execute another file with the same rules specified in the all command. To run this command, the project must be compiled beforehand (either with the all or with the compile actions).
+
+	-clean: it eliminates all the files in the compiled folder. It also eliminates the lexer, parser and sym java files generated when compiling.
+
+ORGANIZATION OF THE PROJECT:
+For this particular assignment I have added 3 java files to the project. 
+
+First of all, the StaticChecker file, in which we get the AST of the program and need to check that it is semantically correct. It is modularized in different nested methods, so that the program checker calls all the class checkers, which calls the method checkers and so on. I have created to private static classes: the class descriptor that basically stores the methods, fields and variables of a class so that it is easier to check if a certain method that is called in an statement is defined or not and so on; and the environment class, which main purpose is to define the domains of all the variables, so that for example a variable defined inside a loop isnt accessed outside of it.
+Then, the second file is the Ir3.java file, which basically defines all the different classes that represents the program we are compiling (program, class, method, statement...). It is the same as the Ast class defined in the past assignment, but for Ir3 code.
+Finally, the last file is the Ir3Generator, which basically takes a AST and returns a list of datas and a list of methods corresponding to the actual ir3 code. It is organised in the same way than the checker, but instead of looking for semantic errors it generates different objects of the classes defined in the ir3.java file.
+
+MAJOR DIFFICULTIES:
+During the development of the project, I have encountered two main difficulties: 
+First of all, the code generation has been the most difficult part of the project by far. Sometimes it wasn't obvious to me what code I should generate to 'translate' some of the structures. In that sense, I encountered some difficulty when generating the if-else equivalent into ir3 code (because of all the labels and gotos). The second most difficult part was the Checker, which I didnt know how to organize at first. However, after orginizing it properly the only difficulty left was to do the check for statements, because of the ammount of different possibilities needed to be checked (compatible types in both sides, check that the method exists in a call statement, check that a class exist in a new statement...).
+

@@ -20,7 +20,9 @@ public class Ir3Generator {
     private int labelCounter;
 
     public static void main(String[] args) throws Exception {
-        Ast.Program prog = parser.parse(new BufferedReader(new FileReader(args[0])));
+        Ast.Program prog = Parser.parse(new BufferedReader(new FileReader(args[0])));
+        System.out.println("Running the checker...");
+        System.out.println();
         try {
             StaticChecker.run(prog);
         } catch (StaticChecker.SemanticErrors e) {
@@ -29,7 +31,21 @@ public class Ir3Generator {
             }
             System.exit(1);
         }
+        System.out.println("Program correctly passed the Static Checker.");
+        System.out.println();
+        System.out.println("Generating Ir3 code...");
+        System.out.println();
+        
         Ir3.Prog irProg = run(prog);
+        
+        System.out.println();
+        System.out.println("//////////////// LITTLEJAVA PROGRAM ////////////////");
+        System.out.println();
+        System.out.print(prog.prettyPrint(0));
+        
+        System.out.println();
+        System.out.println("//////////////// IR3 PROGRAM ////////////////");
+        System.out.println();
         System.out.print(irProg.prettyPrint(0));
     }
 
@@ -177,8 +193,38 @@ public class Ir3Generator {
         ArrayList<Ir3.Stmt> ir3Stmts = new ArrayList<>();
         ArrayList<Ir3.JumpStmt> jumps = new ArrayList<>();
 
-        // IF
-        if (stmt instanceof Ast.IfStmt) {
+        // WHILE
+        if (stmt instanceof Ast.WhileStmt) {
+            CondBlock CondBlock = runCond(((Ast.WhileStmt) stmt).cond, false);
+            StmtBlock StmtBlock = runStmtBlock(((Ast.WhileStmt) stmt).stmts);
+
+            // First add a label
+            Ir3.LabelStmt topLabel = genLabel();
+            ir3Stmts.add(topLabel);
+
+            // Then check condition
+            ir3Stmts.addAll(CondBlock.stmts);
+
+            // If the conditional check has a true jump, add a label
+            if (!CondBlock.trueJumps.isEmpty()) {
+                Ir3.LabelStmt trueLabel = genLabel();
+                ir3Stmts.add(trueLabel);
+                putLabels(CondBlock.trueJumps, trueLabel);
+            }
+
+            // add the body
+            ir3Stmts.addAll(StmtBlock.stmts);
+
+            // If loop body flop, go back to top
+            if (stmtsFlop(StmtBlock.stmts))
+                ir3Stmts.add(new Ir3.GotoStmt(topLabel));
+
+            jumps.addAll(CondBlock.falseJumps);
+            jumps.addAll(StmtBlock.jumps);
+            return new StmtBlock(ir3Stmts, jumps);
+            
+        //IF
+        } else if (stmt instanceof Ast.IfStmt) {
             CondBlock condSect = runCond(((Ast.IfStmt) stmt).cond, false);
             StmtBlock thenSect = runStmtBlock(((Ast.IfStmt) stmt).thenStmts);
             StmtBlock elseSect = runStmtBlock(((Ast.IfStmt) stmt).elseStmts);
@@ -213,34 +259,11 @@ public class Ir3Generator {
 
             return new StmtBlock(ir3Stmts, jumps);
             
-        // WHILE
-        } else if (stmt instanceof Ast.WhileStmt) {
-            CondBlock CondBlock = runCond(((Ast.WhileStmt) stmt).cond, false);
-            StmtBlock StmtBlock = runStmtBlock(((Ast.WhileStmt) stmt).stmts);
-
-            // First add a label
-            Ir3.LabelStmt topLabel = genLabel();
-            ir3Stmts.add(topLabel);
-
-            // Then check condition
-            ir3Stmts.addAll(CondBlock.stmts);
-
-            // If the conditional check has a true jump, add a label
-            if (!CondBlock.trueJumps.isEmpty()) {
-                Ir3.LabelStmt trueLabel = genLabel();
-                ir3Stmts.add(trueLabel);
-                putLabels(CondBlock.trueJumps, trueLabel);
-            }
-
-            // add the body
-            ir3Stmts.addAll(StmtBlock.stmts);
-
-            // If loop body flop, go back to top
-            if (stmtsFlop(StmtBlock.stmts))
-                ir3Stmts.add(new Ir3.GotoStmt(topLabel));
-
-            jumps.addAll(CondBlock.falseJumps);
-            jumps.addAll(StmtBlock.jumps);
+        //PRINTLN
+        } else if (stmt instanceof Ast.PrintlnStmt) {
+            RetValBlock retVal = runRetVal(((Ast.PrintlnStmt) stmt).expr);
+            ir3Stmts.addAll(retVal.stmts);
+            ir3Stmts.add(new Ir3.PrintlnStmt(retVal.retVal));
             return new StmtBlock(ir3Stmts, jumps);
             
         //READLN
@@ -263,11 +286,17 @@ public class Ir3Generator {
                 throw new AssertionError("ERR: no resolved VarDecl with ReadlnStmt");
             }
             
-        //PRINTLN
-        } else if (stmt instanceof Ast.PrintlnStmt) {
-            RetValBlock retVal = runRetVal(((Ast.PrintlnStmt) stmt).expr);
-            ir3Stmts.addAll(retVal.stmts);
-            ir3Stmts.add(new Ir3.PrintlnStmt(retVal.retVal));
+        //FIELD ASSIGNMENT
+        } else if (stmt instanceof Ast.FieldAssignStmt) {
+
+            RetValBlock rightSec = runRetVal(((Ast.FieldAssignStmt) stmt).rhsExpr);
+            ir3Stmts.addAll(rightSec.stmts);
+
+            RetValBlock leftSec = runRetVal(((Ast.FieldAssignStmt) stmt).lhsExpr);
+            ir3Stmts.addAll(leftSec.stmts);
+
+            Ir3.Var leftVar = ((Ir3.VarRetVal) leftSec.retVal).v;
+            ir3Stmts.add(new Ir3.FieldAssignStmt(leftVar, ((Ast.FieldAssignStmt) stmt).lhsField, rightSec.retVal));
             return new StmtBlock(ir3Stmts, jumps);
             
         //VAR ASSIGNMENT
@@ -288,30 +317,6 @@ public class Ir3Generator {
             } else {
                 throw new AssertionError("ERR: no resolved VarDecl with VarAssignStmt");
             }
-            
-        //FIELD ASSIGNMENT
-        } else if (stmt instanceof Ast.FieldAssignStmt) {
-
-            RetValBlock rightSec = runRetVal(((Ast.FieldAssignStmt) stmt).rhsExpr);
-            ir3Stmts.addAll(rightSec.stmts);
-
-            RetValBlock leftSec = runRetVal(((Ast.FieldAssignStmt) stmt).lhsExpr);
-            ir3Stmts.addAll(leftSec.stmts);
-
-            Ir3.Var leftVar = ((Ir3.VarRetVal) leftSec.retVal).v;
-            ir3Stmts.add(new Ir3.FieldAssignStmt(leftVar, ((Ast.FieldAssignStmt) stmt).lhsField, rightSec.retVal));
-            return new StmtBlock(ir3Stmts, jumps);
-            
-        //RETURN 
-        } else if (stmt instanceof Ast.ReturnStmt) {
-            Ir3.RetVal rv = null;
-            if (((Ast.ReturnStmt) stmt).expr != null) {
-                RetValBlock exprSec = runRetVal(((Ast.ReturnStmt) stmt).expr);
-                ir3Stmts.addAll(exprSec.stmts);
-                rv = exprSec.retVal;
-            }
-            ir3Stmts.add(new Ir3.ReturnStmt(rv));
-            return new StmtBlock(ir3Stmts, jumps);
             
         //CALL
         } else if (stmt instanceof Ast.CallStmt) {
@@ -342,6 +347,40 @@ public class Ir3Generator {
 
             ir3Stmts.add(new Ir3.MethodCallStmt(null, irMeth, argRvals));
             return new StmtBlock(ir3Stmts, jumps);
+            
+        //RETURN 
+        } else if (stmt instanceof Ast.ReturnStmt) {
+            Ir3.RetVal rv = null;
+            if (((Ast.ReturnStmt) stmt).expr != null) {
+            	
+            	RetValBlock exprSec = runRetVal(((Ast.ReturnStmt) stmt).expr);
+        		ir3Stmts.addAll(exprSec.stmts);
+        		
+            	if(((Ast.ReturnStmt) stmt).expr instanceof Ast.StringLitExpr) {
+            		Ir3.Var temp = genTemporalVar(new Ast.StringTyp());
+            		ir3Stmts.add(new Ir3.AssignStmt(temp, exprSec.retVal));
+            		ir3Stmts.add(new Ir3.ReturnStmt(new Ir3.VarRetVal(temp)));
+            	}
+            	else if (((Ast.ReturnStmt) stmt).expr instanceof Ast.IntLitExpr) {
+            		Ir3.Var temp = genTemporalVar(new Ast.IntTyp());
+            		ir3Stmts.add(new Ir3.AssignStmt(temp, exprSec.retVal));
+            		ir3Stmts.add(new Ir3.ReturnStmt(new Ir3.VarRetVal(temp)));
+            	}
+            	else if (((Ast.ReturnStmt) stmt).expr instanceof Ast.BoolLitExpr) {
+            		Ir3.Var temp = genTemporalVar(new Ast.BoolTyp());
+            		ir3Stmts.add(new Ir3.AssignStmt(temp, exprSec.retVal));
+            		ir3Stmts.add(new Ir3.ReturnStmt(new Ir3.VarRetVal(temp)));
+            	}
+            	else if (((Ast.ReturnStmt) stmt).expr instanceof Ast.NullLitExpr) {
+            		Ir3.Var temp = genTemporalVar(new Ast.NullTyp());
+            		ir3Stmts.add(new Ir3.AssignStmt(temp, exprSec.retVal));
+            		ir3Stmts.add(new Ir3.ReturnStmt(new Ir3.VarRetVal(temp)));
+            	} else {
+                    rv = exprSec.retVal;
+                    ir3Stmts.add(new Ir3.ReturnStmt(rv));
+            	}
+            }
+            return new StmtBlock(ir3Stmts, jumps);
 
         } else {
             throw new AssertionError("ERR");
@@ -349,15 +388,14 @@ public class Ir3Generator {
     }
 
     private RetValBlock runRetVal(Ast.Expr expr) {
-    	
-        if (expr instanceof Ast.StringLitExpr) {
+    	 if (expr instanceof Ast.BoolLitExpr) {
+            return new RetValBlock(new Ir3.BoolRetVal(((Ast.BoolLitExpr) expr).b), new ArrayList<>());
+       
+        } else if (expr instanceof Ast.StringLitExpr) {
             return new RetValBlock(new Ir3.StringRetVal(((Ast.StringLitExpr) expr).str), new ArrayList<>());
             
         } else if (expr instanceof Ast.IntLitExpr) {
             return new RetValBlock(new Ir3.IntRetVal(((Ast.IntLitExpr) expr).i), new ArrayList<>());
-            
-        } else if (expr instanceof Ast.BoolLitExpr) {
-            return new RetValBlock(new Ir3.BoolRetVal(((Ast.BoolLitExpr) expr).b), new ArrayList<>());
             
         } else if (expr instanceof Ast.NullLitExpr) {
             return new RetValBlock(new Ir3.NullRetVal(), new ArrayList<>());
